@@ -11,7 +11,7 @@ const app = express();
 
 // ==================== CONFIG (NDANI YA CODE) ====================
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.API_KEY || 'sila_secret_key_change_me_1234567890';
+const API_KEY = process.env.API_KEY || 'silatech22';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://sila_md:sila0022@sila.67mxtd7.mongodb.net/sila_sessions?retryWrites=true&w=majority';
 
 // ==================== MIDDLEWARE ====================
