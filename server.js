@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const Session = require('./models/Session');
 
 const app = express();
@@ -17,6 +18,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://sila_md:sila0022@s
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Serve dashboard (static files) — KABLA ya routes
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Auth middleware
 function authMiddleware(req, res, next) {
   const key = req.headers['x-api-key'] || req.query.apiKey;
   if (!key || key !== API_KEY) {
@@ -26,7 +31,9 @@ function authMiddleware(req, res, next) {
 }
 
 // ==================== ROUTES ====================
-app.get('/', (req, res) => {
+
+// Health check (bila auth) — dashboard inatumia hii
+app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     name: 'SILA Session DB API',
@@ -36,13 +43,46 @@ app.get('/', (req, res) => {
   });
 });
 
+// Root — kama dashboard haipo, rudisha info
+app.get('/', (req, res, next) => {
+  // express.static inashughulikia '/' kama public/index.html ipo
+  // Kama haipo, tutarudisha JSON
+  const fs = require('fs');
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.json({
+    status: 'ok',
+    name: 'SILA Session DB API',
+    version: '1.0.0',
+    owner: 'Sila Tech',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    endpoints: {
+      dashboard: 'GET / (kama public/index.html ipo)',
+      health: 'GET /api/health',
+      saveSession: 'POST /api/session (auth)',
+      getSession: 'GET /api/session/:number (auth)',
+      getAllSessions: 'GET /api/sessions (auth)',
+      deleteSession: 'DELETE /api/session/:number (auth)',
+      touchSession: 'POST /api/session/:number/touch (auth)'
+    }
+  });
+});
+
+// ==================== SAVE / UPDATE SESSION ====================
 app.post('/api/session', authMiddleware, async (req, res) => {
   try {
     const { number, creds, keys } = req.body;
+
     if (!number || !creds) {
       return res.status(400).json({ status: 'error', message: 'number and creds are required' });
     }
+
     const sanitized = String(number).replace(/\D/g, '');
+    if (!sanitized) {
+      return res.status(400).json({ status: 'error', message: 'Invalid number format' });
+    }
 
     const existing = await Session.findOne({ number: sanitized });
     if (existing) {
@@ -54,12 +94,14 @@ app.post('/api/session', authMiddleware, async (req, res) => {
       return res.json({ status: 'ok', message: 'Session updated', number: sanitized });
     }
 
-    await Session.create({
+    const newSession = new Session({
       number: sanitized,
       creds,
       keys: keys || {},
       lastConnected: new Date()
     });
+    await newSession.save();
+
     return res.json({ status: 'ok', message: 'Session saved', number: sanitized });
   } catch (err) {
     console.error('POST /api/session error:', err);
@@ -67,13 +109,16 @@ app.post('/api/session', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== GET ONE SESSION ====================
 app.get('/api/session/:number', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
     const session = await Session.findOne({ number: sanitized });
+
     if (!session) {
       return res.status(404).json({ status: 'error', message: 'Session not found' });
     }
+
     res.json({
       status: 'ok',
       session: {
@@ -81,7 +126,8 @@ app.get('/api/session/:number', authMiddleware, async (req, res) => {
         creds: session.creds,
         keys: session.keys,
         isActive: session.isActive,
-        lastConnected: session.lastConnected
+        lastConnected: session.lastConnected,
+        createdAt: session.createdAt
       }
     });
   } catch (err) {
@@ -90,6 +136,7 @@ app.get('/api/session/:number', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== GET ALL SESSIONS ====================
 app.get('/api/sessions', authMiddleware, async (req, res) => {
   try {
     const sessions = await Session.find({}).select('number isActive lastConnected createdAt');
@@ -109,13 +156,16 @@ app.get('/api/sessions', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== DELETE SESSION ====================
 app.delete('/api/session/:number', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
     const result = await Session.findOneAndDelete({ number: sanitized });
+
     if (!result) {
       return res.status(404).json({ status: 'error', message: 'Session not found' });
     }
+
     res.json({ status: 'ok', message: 'Session deleted', number: sanitized });
   } catch (err) {
     console.error('DELETE /api/session error:', err);
@@ -123,6 +173,7 @@ app.delete('/api/session/:number', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== TOUCH SESSION ====================
 app.post('/api/session/:number/touch', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
@@ -133,11 +184,16 @@ app.post('/api/session/:number/touch', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== 404 HANDLER ====================
+app.use((req, res) => {
+  res.status(404).json({ status: 'error', message: 'Endpoint not found' });
+});
+
 // ==================== START SERVER ====================
 async function start() {
   try {
     console.log('🔌 Connecting to MongoDB...');
-    console.log('📡 URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@')); // hide credentials
+    console.log('📡 URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@'));
 
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
@@ -147,6 +203,7 @@ async function start() {
 
     app.listen(PORT, () => {
       console.log(`🚀 SILA Session DB API running on port ${PORT}`);
+      console.log(`🌐 Dashboard: http://localhost:${PORT}/`);
       console.log(`🔑 API Key: ${API_KEY}`);
       console.log(`📢 Owner: Sila Tech`);
     });
