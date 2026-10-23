@@ -7,14 +7,16 @@ const cors = require('cors');
 const Session = require('./models/Session');
 
 const app = express();
+
+// ==================== CONFIG (NDANI YA CODE) ====================
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.API_KEY;
+const API_KEY = process.env.API_KEY || 'sila_secret_key_change_me_1234567890';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://sila_md:sila0022@sila.67mxtd7.mongodb.net/sila_sessions?retryWrites=true&w=majority';
 
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Auth middleware — kila request inahitaji x-api-key
 function authMiddleware(req, res, next) {
   const key = req.headers['x-api-key'] || req.query.apiKey;
   if (!key || key !== API_KEY) {
@@ -24,34 +26,22 @@ function authMiddleware(req, res, next) {
 }
 
 // ==================== ROUTES ====================
-
-// Health check (bila auth)
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
     name: 'SILA Session DB API',
     version: '1.0.0',
     owner: 'Sila Tech',
-    endpoints: {
-      saveSession: 'POST /api/session (auth)',
-      getSession: 'GET /api/session/:number (auth)',
-      getAllSessions: 'GET /api/sessions (auth)',
-      deleteSession: 'DELETE /api/session/:number (auth)',
-      updateLastConnected: 'POST /api/session/:number/touch (auth)'
-    }
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
-// ==================== SAVE / UPDATE SESSION ====================
-// Body: { number, creds, keys }
 app.post('/api/session', authMiddleware, async (req, res) => {
   try {
     const { number, creds, keys } = req.body;
-
     if (!number || !creds) {
       return res.status(400).json({ status: 'error', message: 'number and creds are required' });
     }
-
     const sanitized = String(number).replace(/\D/g, '');
 
     const existing = await Session.findOne({ number: sanitized });
@@ -64,14 +54,12 @@ app.post('/api/session', authMiddleware, async (req, res) => {
       return res.json({ status: 'ok', message: 'Session updated', number: sanitized });
     }
 
-    const newSession = new Session({
+    await Session.create({
       number: sanitized,
       creds,
       keys: keys || {},
       lastConnected: new Date()
     });
-    await newSession.save();
-
     return res.json({ status: 'ok', message: 'Session saved', number: sanitized });
   } catch (err) {
     console.error('POST /api/session error:', err);
@@ -79,16 +67,13 @@ app.post('/api/session', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== GET ONE SESSION ====================
 app.get('/api/session/:number', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
     const session = await Session.findOne({ number: sanitized });
-
     if (!session) {
       return res.status(404).json({ status: 'error', message: 'Session not found' });
     }
-
     res.json({
       status: 'ok',
       session: {
@@ -105,7 +90,6 @@ app.get('/api/session/:number', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== GET ALL SESSIONS ====================
 app.get('/api/sessions', authMiddleware, async (req, res) => {
   try {
     const sessions = await Session.find({}).select('number isActive lastConnected createdAt');
@@ -125,16 +109,13 @@ app.get('/api/sessions', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== DELETE SESSION ====================
 app.delete('/api/session/:number', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
     const result = await Session.findOneAndDelete({ number: sanitized });
-
     if (!result) {
       return res.status(404).json({ status: 'error', message: 'Session not found' });
     }
-
     res.json({ status: 'ok', message: 'Session deleted', number: sanitized });
   } catch (err) {
     console.error('DELETE /api/session error:', err);
@@ -142,7 +123,6 @@ app.delete('/api/session/:number', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== TOUCH SESSION (update lastConnected) ====================
 app.post('/api/session/:number/touch', authMiddleware, async (req, res) => {
   try {
     const sanitized = String(req.params.number).replace(/\D/g, '');
@@ -156,18 +136,23 @@ app.post('/api/session/:number/touch', authMiddleware, async (req, res) => {
 // ==================== START SERVER ====================
 async function start() {
   try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI is not set in .env');
-    }
-    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('🔌 Connecting to MongoDB...');
+    console.log('📡 URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@')); // hide credentials
+
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
     console.log('✅ Connected to MongoDB');
 
     app.listen(PORT, () => {
       console.log(`🚀 SILA Session DB API running on port ${PORT}`);
+      console.log(`🔑 API Key: ${API_KEY}`);
       console.log(`📢 Owner: Sila Tech`);
     });
   } catch (err) {
     console.error('❌ Failed to start:', err.message);
+    console.error('Full error:', err);
     process.exit(1);
   }
 }
