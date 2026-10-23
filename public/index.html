@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SILA Session DB — Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #111827;
+    --card-hover: #1a2332;
+    --border: #1f2937;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --primary: #3b82f6;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  /* Header */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+  .logo h1 { font-size: 22px; font-weight: 700; }
+  .logo p { font-size: 13px; color: var(--muted); }
+
+  .status-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--success);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .status-badge.error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+  }
+  .status-badge.error .status-dot { background: var(--danger); }
+
+  /* Auth section */
+  .auth-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+  }
+  .auth-box h3 { font-size: 15px; margin-bottom: 12px; color: var(--muted); }
+  .auth-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .auth-row input {
+    flex: 1;
+    min-width: 250px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+  }
+  .auth-row input:focus { outline: none; border-color: var(--primary); }
+
+  /* Buttons */
+  button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #2563eb; transform: translateY(-1px); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover:not(:disabled) { background: #059669; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover:not(:disabled) { background: #dc2626; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) { background: var(--card-hover); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .stat-card .label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .stat-card.success .value { color: var(--success); }
+  .stat-card.warning .value { color: var(--warning); }
+
+  /* Sections */
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+  }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .section-header h2 {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Sessions table */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    padding: 14px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  tr:hover { background: var(--card-hover); }
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+
+  /* Form */
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+  }
+  .form-group textarea { min-height: 100px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  /* Toast */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .toast {
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    min-width: 250px;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--danger); }
+  .toast.info { background: var(--primary); }
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 25px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal h3 { margin-bottom: 15px; }
+  .modal pre {
+    background: var(--bg);
+    padding: 15px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .loading {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .footer a { color: var(--primary); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    header { flex-direction: column; align-items: flex-start; }
+    .stat-card .value { font-size: 22px; }
+    th, td { padding: 10px 8px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🤖</div>
+      <div>
+        <h1>SILA Session DB</h1>
+        <p>Session Database Dashboard — Sila Tech</p>
+      </div>
+    </div>
+    <div class="status-badge" id="statusBadge">
+      <span class="status-dot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- AUTH -->
+  <div class="auth-box">
+    <h3>🔑 API Key</h3>
+    <div class="auth-row">
+      <input type="password" id="apiKeyInput" placeholder="Weka API key yako hapa..." />
+      <button class="btn-primary" onclick="saveApiKey()">Save</button>
+      <button class="btn-ghost" onclick="clearApiKey()">Clear</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats" id="statsContainer">
+    <div class="stat-card">
+      <div class="label">Total Sessions</div>
+      <div class="value" id="statTotal">—</div>
+    </div>
+    <div class="stat-card success">
+      <div class="label">Active</div>
+      <div class="value" id="statActive">—</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="label">Inactive</div>
+      <div class="value" id="statInactive">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">DB Status</div>
+      <div class="value" id="statDb" style="font-size:18px">—</div>
+    </div>
+  </div>
+
+  <!-- SESSIONS -->
+  <div class="section">
+    <div class="section-header">
+      <h2>📋 Sessions Zote</h2>
+      <button class="btn-ghost btn-sm" onclick="loadSessions()">🔄 Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Status</th>
+            <th>Last Connected</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sessionsTable">
+          <tr><td colspan="5" class="empty">Weka API key kisha bonyeza Refresh</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ADD SESSION -->
+  <div class="section">
+    <div class="section-header">
+      <h2>➕ Ongeza / Update Session</h2>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Number (mfano: 255789661031)</label>
+        <input type="text" id="newNumber" placeholder="255789661031" />
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:15px">
+      <label>Creds (JSON)</label>
+      <textarea id="newCreds" placeholder='{"test": true}'>{}</textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:15px">
+      <label>Keys (JSON) — hiari</label>
+      <textarea id="newKeys" placeholder='{}'>{}</textarea>
+    </div>
+    <button class="btn-success" onclick="saveSession()">💾 Save Session</button>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🛠️ Quick Actions</h2>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="loadSessions()">📋 Get All Sessions</button>
+      <button class="btn-ghost" onclick="testHealth()">❤️ Health Check</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    Made with ❤️ by <a href="https://wa.me/255789661031" target="_blank">Sila Tech</a> — 255789661031
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle">Session Details</h3>
+    <pre id="modalContent"></pre>
+    <div style="margin-top:15px;display:flex;gap:10px">
+      <button class="btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const API_BASE = window.location.origin;
+let apiKey = localStorage.getItem('sila_api_key') || '';
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  if (apiKey) {
+    document.getElementById('apiKeyInput').value = apiKey;
+    testHealth();
+    loadSessions();
+  } else {
+    updateStatus(false, 'No API key');
+  }
+});
+
+// ==================== AUTH ====================
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) return toast('Weka API key kwanza', 'error');
+  apiKey = key;
+  localStorage.setItem('sila_api_key', key);
+  toast('API key imehifadhiwa', 'success');
+  testHealth();
+  loadSessions();
+}
+
+function clearApiKey() {
+  apiKey = '';
+  localStorage.removeItem('sila_api_key');
+  document.getElementById('apiKeyInput').value = '';
+  toast('API key imefutwa', 'info');
+  updateStatus(false, 'No API key');
+  document.getElementById('sessionsTable').innerHTML =
+    '<tr><td colspan="5" class="empty">Weka API key kisha bonyeza Refresh</td></tr>';
+}
+
+// ==================== API HELPERS ====================
+async function apiRequest(path, options = {}) {
+  if (!apiKey) throw new Error('API key haijawekwa');
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      ...(options.headers || {})
+    }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+  return data;
+}
+
+// ==================== HEALTH ====================
+async function testHealth() {
+  try {
+    const res = await fetch(API_BASE + '/');
+    const data = await res.json();
+    const dbOk = data.db === 'connected';
+    updateStatus(dbOk, dbOk ? 'DB Connected' : 'DB Disconnected');
+    document.getElementById('statDb').textContent = dbOk ? 'Connected' : 'Disconnected';
+    document.getElementById('statDb').style.color = dbOk ? 'var(--success)' : 'var(--danger)';
+  } catch (err) {
+    updateStatus(false, 'API Offline');
+    document.getElementById('statDb').textContent = 'Offline';
+    document.getElementById('statDb').style.color = 'var(--danger)';
+  }
+}
+
+function updateStatus(ok, text) {
+  const badge = document.getElementById('statusBadge');
+  document.getElementById('statusText').textContent = text;
+  badge.classList.toggle('error', !ok);
+}
+
+// ==================== LOAD SESSIONS ====================
+async function loadSessions() {
+  if (!apiKey) return toast('Weka API key kwanza', 'error');
+  const tbody = document.getElementById('sessionsTable');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty"><span class="loading"></span> Loading...</td></tr>';
+
+  try {
+    const data = await apiRequest('/api/sessions');
+    const sessions = data.sessions || [];
+
+    // Stats
+    const active = sessions.filter(s => s.isActive).length;
+    document.getElementById('statTotal').textContent = sessions.length;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statInactive').textContent = sessions.length - active;
+
+    if (sessions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Hakuna sessions bado</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = sessions.map(s => `
+      <tr>
+        <td><strong>${escapeHtml(s.number)}</strong></td>
+        <td>${s.isActive
+          ? '<span style="color:var(--success)">● Active</span>'
+          : '<span style="color:var(--muted)">○ Inactive</span>'}</td>
+        <td>${formatDate(s.lastConnected)}</td>
+        <td>${formatDate(s.createdAt)}</td>
+        <td>
+          <button class="btn-ghost btn-sm" onclick="viewSession('${escapeHtml(s.number)}')">👁️ View</button>
+          <button class="btn-danger btn-sm" onclick="deleteSession('${escapeHtml(s.number)}')">🗑️ Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="color:var(--danger)">❌ ${escapeHtml(err.message)}</td></tr>`;
+    toast(err.message, 'error');
+  }
+}
+
+// ==================== VIEW SESSION ====================
+async function viewSession(number) {
+  try {
+    const data = await apiRequest('/api/session/' + encodeURIComponent(number));
+    document.getElementById('modalTitle').textContent = '📱 Session: ' + number;
+    document.getElementById('modalContent').textContent = JSON.stringify(data.session, null, 2);
+    document.getElementById('modalOverlay').classList.add('active');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ==================== DELETE SESSION ====================
+async function deleteSession(number) {
+  if (!confirm(`Una uhakika unataka kufuta session ya ${number}?`)) return;
+  try {
+    await apiRequest('/api/session/' + encodeURIComponent(number), { method: 'DELETE' });
+    toast('Session imefutwa', 'success');
+    loadSessions();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ==================== SAVE SESSION ====================
+async function saveSession() {
+  const number = document.getElementById('newNumber').value.trim();
+  const credsRaw = document.getElementById('newCreds').value.trim() || '{}';
+  const keysRaw = document.getElementById('newKeys').value.trim() || '{}';
+
+  if (!number) return toast('Weka number', 'error');
+
+  let creds, keys;
+  try { creds = JSON.parse(credsRaw); } catch { return toast('Creds JSON si sahihi', 'error'); }
+  try { keys = JSON.parse(keysRaw); } catch { return toast('Keys JSON si sahihi', 'error'); }
+
+  try {
+    const data = await apiRequest('/api/session', {
+      method: 'POST',
+      body: JSON.stringify({ number, creds, keys })
+    });
+    toast(data.message || 'Session imehifadhiwa', 'success');
+    document.getElementById('newNumber').value = '';
+    document.getElementById('newCreds').value = '{}';
+    document.getElementById('newKeys').value = '{}';
+    loadSessions();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ==================== MODAL ====================
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+// ==================== UTILS ====================
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('sw-TZ', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch { return iso; }
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function toast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+</script>
+</body>
+</html>
